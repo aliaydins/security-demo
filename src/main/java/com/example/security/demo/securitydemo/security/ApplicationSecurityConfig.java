@@ -12,6 +12,11 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+
+import java.util.concurrent.TimeUnit;
+
 import static com.example.security.demo.securitydemo.security.ApplicationUserRole.*;
 import static com.example.security.demo.securitydemo.security.ApplicationUserPermission.*;
 
@@ -30,19 +35,35 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
-       http
-               .csrf().disable()
-               .authorizeRequests()
-               .antMatchers("/","index","/css/*","/js/*").permitAll()
-               .antMatchers("/api/**").hasRole(STUDENT.name())
-               .antMatchers(HttpMethod.DELETE,"/management/api/**").hasAuthority(COURSE_WRITE.getPermission())
-               .antMatchers(HttpMethod.POST,"/management/api/**").hasAuthority(COURSE_WRITE.getPermission())
-               .antMatchers(HttpMethod.PUT,"/management/api/**").hasAuthority(COURSE_WRITE.getPermission())
-               .antMatchers(HttpMethod.GET,"/management/api/**").hasAnyRole(ADMIN.name(),ADMINTRAINEE.name())
-               .anyRequest()
-               .authenticated()
-               .and()
-               .httpBasic();
+        http
+                .csrf().disable()
+                .authorizeRequests()
+                .antMatchers("/", "index", "/css/*", "/js/*").permitAll()
+                .antMatchers("/api/**").hasRole(STUDENT.name())
+                .anyRequest()
+                .authenticated()
+                .and()
+                .formLogin()
+                        .loginPage("/login").permitAll()
+                        .defaultSuccessUrl("/courses", true)
+                        .passwordParameter("password")
+                        .passwordParameter("username")
+                .and()
+                .rememberMe()
+                        .tokenValiditySeconds((int) TimeUnit.DAYS.toSeconds(21))
+                        .key("somethingverysecured")
+                        .rememberMeParameter("remember-me")
+                .and()
+                .logout()
+                        .logoutUrl("/logout")
+                        .logoutRequestMatcher(new AntPathRequestMatcher("/logout","GET"))
+                        .clearAuthentication(true)
+                        .invalidateHttpSession(true)
+                        .deleteCookies("JSESSIONID", "remember-me")
+                        .logoutSuccessUrl("/login");
+
+
+
     }
 
     @Override
@@ -54,13 +75,13 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
                 //.roles(ApplicationUserRole.STUDENT.name()) //ROLE_STUDENT
                 .authorities(STUDENT.getGrantedAuthorities())
                 .build();
-        UserDetails lindaUser=User.builder()
+        UserDetails lindaUser = User.builder()
                 .username("linda")
                 .password(passwordEncoder.encode("password123"))
                 //.roles(ApplicationUserRole.ADMIN.name())
                 .authorities(ADMIN.getGrantedAuthorities())
                 .build();
-        UserDetails tomUser=User.builder()
+        UserDetails tomUser = User.builder()
                 .username("tom")
                 .password(passwordEncoder.encode("password123"))
                 //.roles(ApplicationUserRole.ADMINTRAINEE.name())
